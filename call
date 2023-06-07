@@ -1,0 +1,71 @@
+from threadpool import ThreadPool, Task
+import time
+import random
+
+
+# 定义一个计算密集型任务
+def 计算(num):
+    result = 0
+    for i in range(num):
+        result += i
+
+    return result
+
+
+# 定义一个 IO 密集型任务
+def 下载(url):
+    print(f"开始下载：{url}")
+    time.sleep(2)  # 模拟下载过程
+    print(f"下载完成：{url}")
+    return url
+
+
+# 定义一个任务进度回调函数
+def 进度回调(task):
+    完成数 = len(task.done)
+    总任务数 = len(task.tasks)
+    print(f"已完成任务数：{完成数}/{总任务数}")
+
+
+# 创建线程池，设置线程数为2
+线程池 = ThreadPool(num_threads=2)
+
+# 一次添加多个任务，每个任务携带一个优先级参数，并将下载任务设置为超时3秒钟
+urls = ["http://www.baidu.com", "http://www.sina.com", "http://www.google.com", "http://www.qq.com"]
+tasks = [Task(下载, kwargs={"url": url}, priority=random.randint(0, 3), timeout=3) for url in urls]
+
+# 将多个任务添加到线程池，并启动线程池
+for task in tasks:
+    线程池.add_task(task)
+线程池.start()
+
+# 监听任务进度
+while not 线程池.tasks.empty():
+    线程池.wait(0.1, 进度回调)
+
+# 获取所有任务的返回结果
+while not 线程池.done:
+    线程池.wait(0.1)
+    for task in 线程池.tasks.all_tasks:
+        if task.done:
+            print(task.get())
+            线程池.tasks.task_done(task)
+
+# 对线程池进行动态调整
+新的线程数 = 4
+线程池.resize(new_num_threads=新的线程数)
+
+# 继续添加新任务
+num = 10000000
+线程池.add_task(计算, args=(num,), priority=2)
+线程池.add_task(下载, kwargs={"url": "http://www.sohu.com"}, priority=1)
+
+# 等待所有任务完成
+线程池.wait_all()
+
+# 打印所有任务的返回结果
+for task in 线程池.tasks.all_tasks:
+    if task.done:
+        print(task.get())
+    else:
+        print(f"任务{task}超时")
